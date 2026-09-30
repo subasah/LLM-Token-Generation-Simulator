@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Token Generation Simulator</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              400: '#2dd4bf',
+              500: '#14b8a6',
+              600: '#0d9488',
+              900: '#134e4a',
+              950: '#042f2e',
+            },
+            cyber: {
+              bg: '#090d16',
+              card: '#111827',
+              border: '#1f293d',
+              accent: '#38bdf8',
+              neon: '#a855f7'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'Monaco', 'monospace'],
+          },
+          animation: {
+            'pulse-fast': 'pulse 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'glow-pulse': 'glow 2s ease-in-out infinite alternate',
+          },
+          keyframes: {
+            glow: {
+              '0%': { boxShadow: '0 0 5px rgba(56, 189, 248, 0.2)' },
+              '100%': { boxShadow: '0 0 20px rgba(168, 85, 247, 0.6)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 & Babel Standalone -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Marked.js for Markdown Rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  
+  <!-- Canvas Confetti for Generation Completion -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Custom Styles -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    body {
+      background-color: #080c14;
+      color: #f3f4f6;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d1322;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1f293d;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #374151;
+    }
+
+    /* Blinking Terminal Cursor */
+    .terminal-cursor {
+      display: inline-block;
+      width: 0.55em;
+      height: 1.1em;
+      background-color: #38bdf8;
+      vertical-align: -0.15em;
+      margin-left: 2px;
+      animation: blink 0.9s step-start infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    /* Token Badge Hover Glass Effect */
+    .token-badge {
+      transition: all 0.15s ease-in-out;
+      user-select: none;
+    }
+    .token-badge:hover {
+      transform: translateY(-2px) scale(1.05);
+      z-index: 20;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+    // ==========================================
+    // PRESET CONTENT DATA
+    // ==========================================
+    const TEXT_PRESETS = {
+      monologue: {
+        title: "AI Assistant Monologue",
+        category: "Markdown & Prose",
+        text: `# Artificial Intelligence & Synthetic Reasoning
+
+Welcome! As an advanced **Large Language Model (LLM)**, I generate text token by token through **autoregressive inference**.
+
+### Key Architectural Concepts:
+- **Transformer Architecture**: Uses multi-head self-attention mechanisms to process contextual sequences in parallel during training and sequentially during generation.
+- **Subword Tokenizer**: Converts raw text strings into discrete subword integer tokens (e.g., Tiktoken, Byte-Pair Encoding).
+- **Latency & Throughput**: Measured in **Tokens Per Second (t/s)** and **Time-To-First-Token (TTFT)**.
+
+\`\`\`python
+def generate_tokens(prompt: str, temperature: float = 0.7):
+    """Simulates LLM token streaming generation."""
+    tokens = tokenizer.encode(prompt)
+    for token_id in tokens:
+        yield model.predict_next(token_id, temp=temperature)
+\`\`\`
+
+> "Token generation is not just printing characters; it is a dynamic probability distribution traversal across high-dimensional latent embedding spaces."
+
+*Ready to explore token generation dynamics at high speed? Adjust the speed slider on the left panel!*`
+      },
+      python: {
+        title: "Python Async Web Server",
+        category: "Code Snippet",
+        text: `import asyncio
+import time
+from typing import AsyncGenerator
+from fastapi import FastAPI, BackgroundTasks
+from fastapi.responses import StreamingResponse
+
+app = FastAPI(title="LLM Streaming Engine API", version="3.2.0")
+
+class TokenStreamer:
+    def __init__(self, model_id: str = "llama-3-70b-instruct"):
+        self.model_id = model_id
+        self.latency_ms = 14.5 # avg inference step time
+
+    async def stream_tokens(self, prompt: str) -> AsyncGenerator[str, None]:
+        tokens = ["Synthesizing", " response", " with", " extreme", " low", " latency", "..."]
+        for token in tokens:
+            await asyncio.sleep(self.latency_ms / 1000.0)
+            yield f'data: {{"token": "{token}", "timestamp": {time.time()}}}\\n\\n'
+
+streamer = TokenStreamer()
+
+@app.get("/v1/chat/completions/stream")
+async def chat_stream(prompt: str):
+    return StreamingResponse(
+        streamer.stream_tokens(prompt),
+        media_type="text/event-stream"
+    )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)`
+      },
+      quantum: {
+        title: "Quantum Computing Explained",
+        category: "Technical Essay",
+        text: `# Deciphering Quantum Supremacy: Qubits & Superposition
+
+Quantum computing represents a fundamental paradigm shift from classical digital computation. While classical computers rely on binary bits constrained to states of strictly **0** or **1**, quantum processors harness the counter-intuitive mechanics of quantum physics.
+
+## Core Pillars of Quantum Computation
+
+1. **Quantum Superposition**:
+   A qubit can exist in a linear combination of states $|0\\rangle$ and $|1\\rangle$ simultaneously, represented as $|\\psi\\rangle = \\alpha|0\\rangle + \\beta|1\\rangle$. This exponential expansion enables $N$ qubits to evaluate $2^N$ states in parallel.
+
+2. **Quantum Entanglement**:
+   Entangled qubits exhibit instantaneous non-local correlations. Measuring the state of one qubit instantly collapses the state of its entangled partner, regardless of spatial distance.
+
+3. **Quantum Interference**:
+   Quantum algorithms manipulate probability amplitudes so that constructive interference amplifies correct solution paths while destructive interference cancels out erroneous computational paths.
+
+### Real-World Applications:
+- **Post-Quantum Cryptography**: Lattice encryption algorithms against quantum decryption.
+- **Molecular Physics**: Accelerating pharmaceutical drug discovery and nitrogen fixation.
+- **High-Dimensional Optimization**: Solving global logistics and financial portfolio risk modeling.`
+      },
+      cyberpunk: {
+        title: "Cyberpunk Sci-Fi Story",
+        category: "Creative Fiction",
+        text: `The neon rain of **Neo-Shinjuku** reflected off the polished chrome exterior of my neural terminal. Raindrops hissed as they vaporized against the over-clocked heat sinks of the portable AI rig.
+
+> "Connection established," whispered the synthetic voice through my audio implants. "Bandwidth locked at 250 Tokens/sec. Matrix sequence ready for execution."
+
+I adjusted my cybergoggles, watching raw token streams flood the heads-up display in electric cyan and neon violet.
+
+\`\`\`bash
+[SYSTEM] Initializing Neural Uplink v9.8.1...
+[STREAM] Latency: 4.2ms | Jitter: 0.8% | Bandwidth: OPTIMAL
+[MODEL] DeepSeek-Cyber-V3 loaded into VRAM [80GB/80GB]
+\`\`\`
+
+"Deploying subroutines now," I muttered into the collar of my trench coat. The AI didn't just read the code; it lived inside the latent embedding space, predicting every algorithmic move before my fingertips could even register on the haptic keyboard.`
+      }
+    };
+
+    // Model Pricing Presets (Per 1 Million Tokens)
+    const MODEL_PRICING = {
+      'gpt-4o': { name: 'GPT-4o', outputCostPer1M: 10.00, inputCostPer1M: 2.50 },
+      'claude-sonnet': { name: 'Claude 3.5 Sonnet', outputCostPer1M: 15.00, inputCostPer1M: 3.00 },
+      'deepseek-v3': { name: 'DeepSeek V3 / R1', outputCostPer1M: 0.55, inputCostPer1M: 0.14 },
+      'llama-70b': { name: 'Llama 3.3 70B (Groq)', outputCostPer1M: 0.79, inputCostPer1M: 0.59 }
+    };
+
+    // Deterministic Token Hash ID Generator
+    function stringToTokenId(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
+      }
+      return Math.abs(hash % 90000) + 10000;
+    }
+
+    // ==========================================
+    // BPE / WORD / CHAR TOKENIZER ENGINE
+    // ==========================================
+    function tokenizeText(text, mode) {
+      if (!text) return [];
+
+      // 1. Character Mode
+      if (mode === 'char') {
+        return text.split('').map((ch, idx) => ({
+          idx,
+          id: 1000 + (ch.charCodeAt(0) % 89000),
+          text: ch,
+          type: ch === '\n' ? 'newline' : ch === ' ' ? 'space' : 'char',
+          length: 1,
+          bytes: new TextEncoder().encode(ch).length
+        }));
+      }
+
+      // 2. Word Mode
+      if (mode === 'word') {
+        const regex = /(\s+|[a-zA-Z0-9_]+|[^\s\a-zA-Z0-9_])/g;
+        const matches = text.match(regex) || [];
+        return matches.map((m, idx) => ({
+          idx,
+          id: stringToTokenId(m),
+          text: m,
+          type: m.includes('\n') ? 'newline' : /^\s+$/.test(m) ? 'space' : /[^\w\s]/.test(m) ? 'punct' : 'word',
+          length: m.length,
+          bytes: new TextEncoder().encode(m).length
+        }));
+      }
+
+      // 3. Simulated BPE Subword Mode
+      const tokens = [];
+      const primaryRegex = /(\n\n|\n| {4}| {2}|(?<=\s)[a-zA-Z0-9_]+|[a-zA-Z0-9_]+|\s+|[^\s\a-zA-Z0-9_])/g;
+      const rawParts = text.match(primaryRegex) || [];
+
+      const prefixes = [
+        'inter', 'trans', 'super', 'under', 'multi', 'hyper', 'cyber', 'quant', 'async',
+        'simul', 'gener', 'token', 'artif', 'intell', 'system', 'stream', 'function', 'import'
+      ];
+
+      const suffixes = [
+        'ization', 'izing', 'tions', 'tion', 'able', 'ment', 'ness', 'fully', 'ally',
+        'istic', 'less', 'ship', 'ing', 'est', 'ous', 'ive', 'ize', 'ted'
+      ];
+
+      rawParts.forEach(part => {
+        if (part.includes('\n') || part.length <= 4 || /^[^\w\s]+$/.test(part) || /^\s+$/.test(part)) {
+          tokens.push({
+            id: stringToTokenId(part),
+            text: part,
+            type: part.includes('\n') ? 'newline' : /^\s+$/.test(part) ? 'space' : /[^\w\s]/.test(part) ? 'punct' : 'word'
+          });
+          return;
+        }
+
+        let wordStr = part;
+        let handled = false;
+        let leadSpace = '';
+
+        if (wordStr.startsWith(' ')) {
+          leadSpace = ' ';
+          wordStr = wordStr.slice(1);
+        }
+
+        const lower = wordStr.toLowerCase();
+
+        // Check suffix split
+        for (const suf of suffixes) {
+          if (lower.endsWith(suf) && lower.length - suf.length >= 3) {
+            const prefixPart = leadSpace + wordStr.slice(0, wordStr.length - suf.length);
+            const suffixPart = wordStr.slice(wordStr.length - suf.length);
+
+            tokens.push({ id: stringToTokenId(prefixPart), text: prefixPart, type: 'subword-root' });
+            tokens.push({ id: stringToTokenId(suffixPart), text: suffixPart, type: 'subword-suffix' });
+            handled = true;
+            break;
+          }
+        }
+
+        if (!handled) {
+          for (const pre of prefixes) {
+            if (lower.startsWith(pre) && lower.length - pre.length >= 3) {
+              const prefixPart = leadSpace + wordStr.slice(0, pre.length);
+              const restPart = wordStr.slice(pre.length);
+
+              tokens.push({ id: stringToTokenId(prefixPart), text: prefixPart, type: 'subword-prefix' });
+              tokens.push({ id: stringToTokenId(restPart), text: restPart, type: 'subword-root' });
+              handled = true;
+              break;
+            }
+          }
+        }
+
+        if (!handled) {
+          if (wordStr.length > 10) {
+            const mid = Math.floor(wordStr.length / 2);
+            const part1 = leadSpace + wordStr.slice(0, mid);
+            const part2 = wordStr.slice(mid);
+            tokens.push({ id: stringToTokenId(part1), text: part1, type: 'subword' });
+            tokens.push({ id: stringToTokenId(part2), text: part2, type: 'subword' });
+          } else {
+            tokens.push({ id: stringToTokenId(part), text: part, type: 'word' });
+          }
+        }
+      });
+
+      return tokens.map((t, idx) => ({
+        ...t,
+        idx,
+        length: t.text.length,
+        bytes: new TextEncoder().encode(t.text).length
+      }));
+    }
+
+    // ==========================================
+    // WEB AUDIO SOUND SYNTHESIZER
+    // ==========================================
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.volume = 0.25;
+        this.soundType = 'digital'; // 'digital', 'mechanical', 'cyberpunk', 'typewriter', 'none'
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTokenSound() {
+        if (this.soundType === 'none' || this.volume <= 0) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+
+        if (this.soundType === 'digital') {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const freq = 850 + Math.random() * 250;
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          osc.frequency.exponentialRampToValueAtTime(300, now + 0.025);
+
+          gain.gain.setValueAtTime(this.volume * 0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.025);
+
+        } else if (this.soundType === 'mechanical') {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(200 + Math.random() * 50, now);
+          osc.frequency.exponentialRampToValueAtTime(40, now + 0.035);
+
+          gain.gain.setValueAtTime(this.volume * 0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.035);
+
+        } else if (this.soundType === 'cyberpunk') {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          const base = 500 + Math.random() * 200;
+          osc.frequency.setValueAtTime(base, now);
+          osc.frequency.linearRampToValueAtTime(base * 1.6, now + 0.03);
+
+          gain.gain.setValueAtTime(this.volume * 0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.03);
+
+        } else if (this.soundType === 'typewriter') {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(1400 + Math.random() * 400, now);
+          osc.frequency.exponentialRampToValueAtTime(200, now + 0.02);
+
+          gain.gain.setValueAtTime(this.volume * 0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.02);
+        }
+      }
+    }
+
+    const soundEngine = new SoundEngine();
+
+    // ==========================================
+    // MAIN REACT APPLICATION COMPONENT
+    // ==========================================
+    function App() {
+      // Configuration & Preset State
+      const [presetKey, setPresetKey] = useState('monologue');
+      const [customText, setCustomText] = useState(TEXT_PRESETS.monologue.text);
+      const [tokenizerMode, setTokenizerMode] = useState('bpe'); // 'bpe', 'word', 'char'
+      const [speedTps, setSpeedTps] = useState(30); // 1 to 250, or 'max'
+      const [isMaxSpeed, setIsMaxSpeed] = useState(false);
+      const [jitterPct, setJitterPct] = useState(15); // 0 to 100%
+      const [soundType, setSoundType] = useState('digital');
+      const [soundVolume, setSoundVolume] = useState(0.25);
+      const [selectedModel, setSelectedModel] = useState('gpt-4o');
+
+      // Display & View Options
+      const [viewMode, setViewMode] = useState('rendered'); // 'rendered', 'badges', 'inspector'
+      const [showTokenIDs, setShowTokenIDs] = useState(true);
+      const [autoScroll, setAutoScroll] = useState(true);
+      const [copied, setCopied] = useState(false);
+
+      // Simulation Stream State
+      const [tokenList, setTokenList] = useState([]);
+      const [currentIndex, setCurrentIndex] = useState(0);
+      const [isPlaying, setIsPlaying] = useState(false);
+
+      // Analytics & Timing State
+      const [startTime, setStartTime] = useState(null);
+      const [elapsedMs, setElapsedMs] = useState(0);
+      const [realtimeTps, setRealtimeTps] = useState(0);
+      const [tpsHistory, setTpsHistory] = useState([]);
+      const [hoveredToken, setHoveredToken] = useState(null);
+
+      // References
+      const outputContainerRef = useRef(null);
+      const canvasRef = useRef(null);
+      const streamTimerRef = useRef(null);
+      const lastTokenTimeRef = useRef(null);
+      const recentTimestampsRef = useRef([]);
+
+      // Initialize Sound Engine Settings
+      useEffect(() => {
+        soundEngine.soundType = soundType;
+        soundEngine.volume = soundVolume;
+      }, [soundType, soundVolume]);
+
+      // Re-tokenize when text preset or tokenizer mode changes
+      useEffect(() => {
+        const textToTokenize = presetKey === 'custom' ? customText : TEXT_PRESETS[presetKey].text;
+        const tokens = tokenizeText(textToTokenize, tokenizerMode);
+        setTokenList(tokens);
+        setCurrentIndex(0);
+        setIsPlaying(false);
+        setStartTime(null);
+        setElapsedMs(0);
+        setRealtimeTps(0);
+        setTpsHistory([]);
+      }, [presetKey, customText, tokenizerMode]);
+
+      // Handle Output Auto Scroll
+      useEffect(() => {
+        if (autoScroll && outputContainerRef.current) {
+          outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
+        }
+      }, [currentIndex, viewMode, autoScroll]);
+
+      // Calculate Accumulated Generated Output Text
+      const generatedText = useMemo(() => {
+        return tokenList.slice(0, currentIndex).map(t => t.text).join('');
+      }, [tokenList, currentIndex]);
+
+      // Total Characters Generated
+      const accumulatedChars = useMemo(() => {
+        return generatedText.length;
+      }, [generatedText]);
+
+      // Rendered HTML from Markdown
+      const renderedMarkdownHtml = useMemo(() => {
+        if (!generatedText) return '';
+        try {
+          return marked.parse(generatedText);
+        } catch (e) {
+          return generatedText;
+        }
+      }, [generatedText]);
+
+      // Estimated Cost Calculation
+      const estimatedCost = useMemo(() => {
+        const model = MODEL_PRICING[selectedModel] || MODEL_PRICING['gpt-4o'];
+        const cost = (currentIndex / 1000000) * model.outputCostPer1M;
+        return cost < 0.0001 ? cost.toFixed(6) : cost.toFixed(4);
+      }, [currentIndex, selectedModel]);
+
+      // Elapsed & ETA Calculations
+      const formattedElapsed = (elapsedMs / 1000).toFixed(2) + 's';
+      const remainingTokens = tokenList.length - currentIndex;
+      const etaMs = realtimeTps > 0 ? (remainingTokens / realtimeTps) * 1000 : 0;
+      const formattedEta = realtimeTps > 0 && remainingTokens > 0 
+        ? (etaMs / 1000).toFixed(1) + 's' 
+        : '0.0s';
+
+      // Chars / Token Efficiency
+      const charsPerToken = currentIndex > 0 ? (accumulatedChars / currentIndex).toFixed(2) : '0.00';
+
+      // Single Token Advance Step Logic
+      const advanceToken = useCallback(() => {
+        setCurrentIndex((prev) => {
+          if (prev >= tokenList.length) {
+            setIsPlaying(false);
+            if (window.confetti && tokenList.length > 0) {
+              window.confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
+            }
+            return prev;
+          }
+
+          soundEngine.playTokenSound();
+
+          const now = performance.now();
+          // Record timestamp for rolling TPS calculation
+          recentTimestampsRef.current.push(now);
+          if (recentTimestampsRef.current.length > 20) {
+            recentTimestampsRef.current.shift();
+          }
+
+          // Calculate rolling average TPS
+          if (recentTimestampsRef.current.length > 1) {
+            const firstTS = recentTimestampsRef.current[0];
+            const durationSec = (now - firstTS) / 1000;
+            if (durationSec > 0) {
+              const currentTPS = (recentTimestampsRef.current.length - 1) / durationSec;
+              setRealtimeTps(Math.round(currentTPS));
+              setTpsHistory((prevHist) => [...prevHist.slice(-40), Math.round(currentTPS)]);
+            }
+          }
+
+          return prev + 1;
+        });
+      }, [tokenList]);
+
+      // Main Streaming Loop Scheduler
+      useEffect(() => {
+        if (!isPlaying || currentIndex >= tokenList.length) {
+          if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
+          return;
+        }
+
+        if (!startTime) {
+          setStartTime(performance.now());
+        }
+
+        const scheduleNextToken = () => {
+          if (isMaxSpeed) {
+            // MAX Speed / Instant burst mode
+            const batchSize = Math.max(1, Math.floor(tokenList.length / 20));
+            setCurrentIndex((prev) => {
+              const nextVal = Math.min(tokenList.length, prev + batchSize);
+              if (nextVal >= tokenList.length) {
+                setIsPlaying(false);
+                if (window.confetti) window.confetti({ particleCount: 60, spread: 70, origin: { y: 0.8 } });
+              }
+              return nextVal;
+            });
+            soundEngine.playTokenSound();
+            streamTimerRef.current = setTimeout(scheduleNextToken, 16); // ~60fps
+            return;
+          }
+
+          // Calculate delay based on TPS target
+          const targetDelayMs = 1000 / speedTps;
+          
+          // Apply Latency Jitter
+          let actualDelay = targetDelayMs;
+          if (jitterPct > 0) {
+            const factor = (Math.random() - 0.5) * 2 * (jitterPct / 100);
+            actualDelay = targetDelayMs * (1 + factor);
+
+            // Random structural pause for LLM reasoning simulation
+            const nextTok = tokenList[currentIndex];
+            if (nextTok && (nextTok.text.includes('\n') || nextTok.text.includes('```')) && Math.random() < 0.25) {
+              actualDelay += 80 + Math.random() * 120;
+            }
+          }
+
+          actualDelay = Math.max(2, actualDelay);
+
+          streamTimerRef.current = setTimeout(() => {
+            advanceToken();
+            scheduleNextToken();
+          }, actualDelay);
+        };
+
+        scheduleNextToken();
+
+        return () => {
+          if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
+        };
+      }, [isPlaying, currentIndex, tokenList, speedTps, isMaxSpeed, jitterPct, advanceToken]);
+
+      // Timer update for elapsed time
+      useEffect(() => {
+        let interval = null;
+        if (isPlaying && startTime) {
+          interval = setInterval(() => {
+            setElapsedMs(performance.now() - startTime);
+          }, 50);
+        } else {
+          clearInterval(interval);
+        }
+        return () => clearInterval(interval);
+      }, [isPlaying, startTime]);
+
+      // Render TPS Sparkline Canvas
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        ctx.clearRect(0, 0, width, height);
+
+        if (tpsHistory.length < 2) {
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.2)';
+          ctx.font = '10px JetBrains Mono';
+          ctx.fillText('Awaiting live telemetry...', 10, 20);
+          return;
+        }
+
+        const maxTPS = Math.max(...tpsHistory, speedTps, 10);
+        const stepX = width / (tpsHistory.length - 1);
+
+        // Draw Area Gradient
+        ctx.beginPath();
+        ctx.moveTo(0, height);
+        tpsHistory.forEach((val, i) => {
+          const x = i * stepX;
+          const y = height - (val / maxTPS) * (height - 8);
+          ctx.lineTo(x, y);
+        });
+        ctx.lineTo(width, height);
+        ctx.closePath();
+
+        const grad = ctx.createLinearGradient(0, 0, 0, height);
+        grad.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+        grad.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Draw Line
+        ctx.beginPath();
+        tpsHistory.forEach((val, i) => {
+          const x = i * stepX;
+          const y = height - (val / maxTPS) * (height - 8);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+      }, [tpsHistory, speedTps]);
+
+      // Stream Control Functions
+      const handlePlayPause = () => {
+        soundEngine.init();
+        if (currentIndex >= tokenList.length) {
+          setCurrentIndex(0);
+          setStartTime(performance.now());
+          setTpsHistory([]);
+        }
+        setIsPlaying(!isPlaying);
+      };
+
+      const handleReset = () => {
+        setIsPlaying(false);
+        setCurrentIndex(0);
+        setStartTime(null);
+        setElapsedMs(0);
+        setRealtimeTps(0);
+        setTpsHistory([]);
+      };
+
+      const handleStep = () => {
+        soundEngine.init();
+        if (currentIndex < tokenList.length) {
+          advanceToken();
+        }
+      };
+
+      const handleCopy = () => {
+        const textToCopy = generatedText;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(textToCopy);
+        } else {
+          const textarea = document.createElement('textarea');
+          textarea.value = textToCopy;
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+        }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      };
+
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-black">
+          
+          {/* TOP NAVBAR */}
+          <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40 px-4 py-3">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+              
+              {/* Brand Logo */}
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                  <svg className="w-5 h-5 text-black font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-sky-300 to-purple-400 bg-clip-text text-transparent">
+                    LLM Token Generation Simulator
+                  </h1>
+                  <p className="text-xs text-slate-400">Autoregressive Stream & Subword Visualizer</p>
+                </div>
+              </div>
+
+              {/* Status Pill & Model Selector */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs font-mono">
+                  <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-emerald-400 animate-pulse' : currentIndex >= tokenList.length && tokenList.length > 0 ? 'bg-cyan-400' : 'bg-amber-400'}`}></span>
+                  <span className="text-slate-300 uppercase font-semibold">
+                    {isPlaying ? 'Streaming' : currentIndex >= tokenList.length && tokenList.length > 0 ? 'Complete' : 'Ready'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 rounded-lg px-2.5 py-1">
+                  <span className="text-xs text-slate-400">Pricing Model:</span>
+                  <select 
+                    value={selectedModel} 
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="bg-transparent text-xs text-cyan-300 font-mono font-medium focus:outline-none cursor-pointer"
+                  >
+                    {Object.entries(MODEL_PRICING).map(([key, item]) => (
+                      <option key={key} value={key} className="bg-slate-900 text-slate-200">
+                        {item.name} (${item.outputCostPer1M}/1M)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+            </div>
+          </header>
+
+          {/* MAIN DASHBOARD CONTAINER */}
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            {/* LEFT SIDEBAR: CONTROL DECK & ANALYTICS */}
+            <div className="lg:col-span-5 flex flex-col gap-5">
+
+              {/* TEXT CONTENT PRESET SELECTOR */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 backdrop-blur-sm shadow-xl">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  Text Content Presets
+                </h2>
+
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {Object.entries(TEXT_PRESETS).map(([key, item]) => (
+                    <button
+                      key={key}
+                      onClick={() => setPresetKey(key)}
+                      className={`text-left p-2.5 rounded-xl border transition-all text-xs ${
+                        presetKey === key 
+                          ? 'bg-cyan-950/60 border-cyan-500/60 text-cyan-200 shadow-md shadow-cyan-950/50' 
+                          : 'bg-slate-800/40 border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="font-medium truncate">{item.title}</div>
+                      <div className="text-[10px] text-slate-400">{item.category}</div>
+                    </button>
+                  ))}
+                  
+                  <button
+                    onClick={() => setPresetKey('custom')}
+                    className={`text-left p-2.5 rounded-xl border transition-all text-xs ${
+                      presetKey === customKeyOrCustom() 
+                        ? 'bg-purple-950/60 border-purple-500/60 text-purple-200 shadow-md shadow-purple-950/50' 
+                        : 'bg-slate-800/40 border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="font-medium truncate">✍️ Custom Text Input</div>
+                    <div className="text-[10px] text-slate-400">User Editable Prompt</div>
+                  </button>
+                </div>
+
+                {/* Custom Text Area Input (When Custom is selected) */}
+                {presetKey === 'custom' && (
+                  <div className="mt-2">
+                    <textarea
+                      value={customText}
+                      onChange={(e) => setCustomText(e.target.value)}
+                      placeholder="Type or paste custom text here..."
+                      rows="4"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+                    ></textarea>
+                  </div>
+                )}
+              </div>
+
+              {/* TOKENIZER MODE & SPEED CONTROLS */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 backdrop-blur-sm shadow-xl flex flex-col gap-4">
+                
+                {/* Tokenizer Selection */}
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2 1m0 0L10 4m2 1v2.5M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5" />
+                      </svg>
+                      Tokenizer Algorithm Mode
+                    </label>
+                    <span className="text-[11px] text-cyan-400 font-mono font-medium">{tokenList.length} Total Tokens</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
+                    <button
+                      onClick={() => setTokenizerMode('bpe')}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
+                        tokenizerMode === 'bpe' ? 'bg-cyan-500 text-black font-semibold shadow' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Real BPE Subword
+                    </button>
+                    <button
+                      onClick={() => setTokenizerMode('word')}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
+                        tokenizerMode === 'word' ? 'bg-cyan-500 text-black font-semibold shadow' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Word Chunks
+                    </button>
+                    <button
+                      onClick={() => setTokenizerMode('char')}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
+                        tokenizerMode === 'char' ? 'bg-cyan-500 text-black font-semibold shadow' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Character Mode
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                    {tokenizerMode === 'bpe' && '• BPE breaks words into subwords (e.g. "token" + "ization", prefixes, punctuation).'}
+                    {tokenizerMode === 'word' && '• Chunks text on standard word boundaries.'}
+                    {tokenizerMode === 'char' && '• Streams character by character (1 char = 1 token).'}
+                  </p>
+                </div>
+
+                <hr className="border-slate-800" />
+
+                {/* Speed Control Slider & Presets */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Generation Speed (Tokens/sec)
+                    </label>
+                    <span className="text-xs font-mono font-bold text-cyan-300">
+                      {isMaxSpeed ? 'MAX (Instant)' : `${speedTps} t/s`}
+                    </span>
+                  </div>
+
+                  <input
+                    type="range"
+                    min="1"
+                    max="250"
+                    disabled={isMaxSpeed}
+                    value={speedTps}
+                    onChange={(e) => setSpeedTps(Number(e.target.value))}
+                    className="w-full accent-cyan-400 cursor-pointer h-2 bg-slate-800 rounded-lg appearance-none"
+                  />
+
+                  {/* Speed Preset Pills */}
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {[5, 30, 70, 150].map((val) => (
+                      <button
+                        key={val}
+                        onClick={() => { setIsMaxSpeed(false); setSpeedTps(val); }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono border transition-all ${
+                          !isMaxSpeed && speedTps === val
+                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                            : 'bg-slate-800/50 border-slate-800 text-slate-400 hover:bg-slate-800'
+                        }`}
+                      >
+                        {val} t/s
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setIsMaxSpeed(!isMaxSpeed)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono border transition-all ${
+                        isMaxSpeed
+                          ? 'bg-purple-500/30 border-purple-400 text-purple-200 font-bold'
+                          : 'bg-slate-800/50 border-slate-800 text-slate-400 hover:bg-slate-800'
+                      }`}
+                    >
+                      ⚡ Max Speed
+                    </button>
+                  </div>
+                </div>
+
+                <hr className="border-slate-800" />
+
+                {/* Latency Jitter Control */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Latency Jitter / Variance
+                    </label>
+                    <span className="text-xs font-mono font-bold text-amber-300">{jitterPct}%</span>
+                  </div>
+
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={jitterPct}
+                    onChange={(e) => setJitterPct(Number(e.target.value))}
+                    className="w-full accent-amber-400 cursor-pointer h-2 bg-slate-800 rounded-lg appearance-none"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Simulates real-world network packet jitter and LLM reasoning bursts.
+                  </p>
+                </div>
+
+                <hr className="border-slate-800" />
+
+                {/* Audio Effects Control */}
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.414m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />
+                      </svg>
+                      Audio Audio Generator (Web Audio)
+                    </label>
+                    <button
+                      onClick={() => soundEngine.playTokenSound()}
+                      className="text-[11px] text-cyan-400 hover:text-cyan-300 font-mono underline"
+                    >
+                      🔊 Test Sound
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <select
+                      value={soundType}
+                      onChange={(e) => setSoundType(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl p-2 focus:outline-none"
+                    >
+                      <option value="digital">Soft Digital Tick</option>
+                      <option value="mechanical">Mechanical Switch</option>
+                      <option value="cyberpunk">Cyberpunk Synth</option>
+                      <option value="typewriter">Typewriter Strike</option>
+                      <option value="none">🔇 Mute Audio</option>
+                    </select>
+
+                    <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-2.5">
+                      <span className="text-[10px] text-slate-400">Vol:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={soundVolume}
+                        onChange={(e) => setSoundVolume(Number(e.target.value))}
+                        className="w-full accent-pink-400 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* LIVE METRICS & ANALYTICS DASHBOARD */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 backdrop-blur-sm shadow-xl flex flex-col gap-3">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
+                    </svg>
+                    Live Telemetry & Metrics
+                  </span>
+                  <span className="text-[10px] font-mono text-emerald-400">REALTIME</span>
+                </h2>
+
+                {/* Progress Bar */}
+                <div>
+                  <div className="flex justify-between text-xs font-mono text-slate-300 mb-1">
+                    <span>Token Progress</span>
+                    <span>{currentIndex} / {tokenList.length} ({tokenList.length ? Math.round((currentIndex / tokenList.length) * 100) : 0}%)</span>
+                  </div>
+                  <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800/80">
+                    <div 
+                      className="bg-gradient-to-r from-cyan-500 via-sky-400 to-purple-500 h-full transition-all duration-75"
+                      style={{ width: `${tokenList.length ? (currentIndex / tokenList.length) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Big Stats Grid */}
+                <div className="grid grid-cols-3 gap-2 text-center my-1">
+                  <div className="bg-slate-950/70 border border-slate-800/60 rounded-xl p-2.5">
+                    <div className="text-[10px] text-slate-400 uppercase font-medium">Measured TPS</div>
+                    <div className="text-xl font-bold font-mono text-cyan-400 mt-0.5">{realtimeTps}</div>
+                    <div className="text-[9px] text-slate-400">Tokens/sec</div>
+                  </div>
+
+                  <div className="bg-slate-950/70 border border-slate-800/60 rounded-xl p-2.5">
+                    <div className="text-[10px] text-slate-400 uppercase font-medium">Elapsed Time</div>
+                    <div className="text-xl font-bold font-mono text-slate-200 mt-0.5">{formattedElapsed}</div>
+                    <div className="text-[9px] text-slate-400">ETA: {formattedEta}</div>
+                  </div>
+
+                  <div className="bg-slate-950/70 border border-slate-800/60 rounded-xl p-2.5">
+                    <div className="text-[10px] text-slate-400 uppercase font-medium">Efficiency</div>
+                    <div className="text-xl font-bold font-mono text-purple-300 mt-0.5">{charsPerToken}</div>
+                    <div className="text-[9px] text-slate-400">Chars / Token</div>
+                  </div>
+                </div>
+
+                {/* Detailed Analytics Row */}
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-300">
+                  <div className="bg-slate-950/40 p-2 rounded-lg border border-slate-800/50 flex justify-between">
+                    <span className="text-slate-400">Total Chars:</span>
+                    <span className="text-slate-200 font-semibold">{accumulatedChars}</span>
+                  </div>
+                  <div className="bg-slate-950/40 p-2 rounded-lg border border-slate-800/50 flex justify-between">
+                    <span className="text-slate-400">Est. Stream Cost:</span>
+                    <span className="text-emerald-400 font-semibold">${estimatedCost}</span>
+                  </div>
+                </div>
+
+                {/* Live Canvas Sparkline Chart */}
+                <div className="mt-1">
+                  <div className="text-[10px] uppercase font-mono text-slate-400 mb-1 flex justify-between">
+                    <span>TPS Speed Sparkline</span>
+                    <span>Peak: {tpsHistory.length ? Math.max(...tpsHistory) : 0} t/s</span>
+                  </div>
+                  <canvas 
+                    ref={canvasRef} 
+                    width="380" 
+                    height="50" 
+                    className="w-full h-12 bg-slate-950 border border-slate-800 rounded-xl"
+                  ></canvas>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* RIGHT MAIN PANEL: OUTPUT TERMINAL & VISUALIZER */}
+            <div className="lg:col-span-7 flex flex-col gap-4">
+
+              {/* TOOLBAR & VIEW MODE TABS */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 backdrop-blur-sm shadow-xl flex flex-wrap items-center justify-between gap-3">
+                
+                {/* View Mode Buttons */}
+                <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <button
+                    onClick={() => setViewMode('rendered')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      viewMode === 'rendered' ? 'bg-cyan-500 text-black font-semibold' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    📄 Rendered Markdown
+                  </button>
+                  <button
+                    onClick={() => setViewMode('badges')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      viewMode === 'badges' ? 'bg-cyan-500 text-black font-semibold' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    🧩 Token Visualizer
+                  </button>
+                  <button
+                    onClick={() => setViewMode('inspector')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      viewMode === 'inspector' ? 'bg-cyan-500 text-black font-semibold' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    📊 Token Matrix Grid
+                  </button>
+                </div>
+
+                {/* Stream Playback Action Buttons */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handlePlayPause}
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 ${
+                      isPlaying 
+                        ? 'bg-amber-500 hover:bg-amber-400 text-black' 
+                        : 'bg-emerald-500 hover:bg-emerald-400 text-black'
+                    }`}
+                  >
+                    {isPlaying ? (
+                      <>
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                        Pause
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        {currentIndex > 0 && currentIndex < tokenList.length ? 'Resume' : 'Play Stream'}
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleStep}
+                    disabled={isPlaying || currentIndex >= tokenList.length}
+                    title="Advance +1 Token Frame"
+                    className="p-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={handleReset}
+                    title="Reset Generator"
+                    className="p-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={handleCopy}
+                    className="p-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 relative"
+                    title="Copy Text Output"
+                  >
+                    {copied ? (
+                      <span className="text-[10px] text-emerald-400 font-bold px-1">Copied!</span>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+              </div>
+
+              {/* TERMINAL FRAME CONTAINING GENERATED CONTENT */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col flex-1 min-h-[500px]">
+                
+                {/* Terminal Window Header Bar */}
+                <div className="bg-slate-950 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+                    <span className="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+                    <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+                    <span className="text-xs font-mono text-slate-400 ml-2">
+                      {viewMode === 'rendered' && 'Rendered Preview Terminal'}
+                      {viewMode === 'badges' && 'Token Subword Boundary Visualizer'}
+                      {viewMode === 'inspector' && 'Token Matrix Inspector Grid'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={autoScroll} 
+                        onChange={(e) => setAutoScroll(e.target.checked)} 
+                        className="rounded accent-cyan-500"
+                      />
+                      Auto Scroll
+                    </label>
+                  </div>
+                </div>
+
+                {/* MAIN STREAM CONTENT AREA */}
+                <div 
+                  ref={outputContainerRef}
+                  className="p-5 flex-1 overflow-y-auto max-h-[620px] font-sans relative text-slate-200"
+                >
+
+                  {/* 1. RENDERED MARKDOWN VIEW */}
+                  {viewMode === 'rendered' && (
+                    <div className="prose prose-invert max-w-none prose-pre:bg-slate-950 prose-pre:border prose-pre:border-slate-800 text-sm leading-relaxed">
+                      {generatedText ? (
+                        <>
+                          <div dangerouslySetInnerHTML={{ __html: renderedMarkdownHtml }}></div>
+                          {currentIndex < tokenList.length && <span className="terminal-cursor"></span>}
+                        </>
+                      ) : (
+                        <div className="text-slate-400 italic font-mono text-xs text-center py-20">
+                          Stream empty. Press "Play Stream" or Step forward to generate tokens...
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 2. TOKEN BADGES VISUALIZER VIEW */}
+                  {viewMode === 'badges' && (
+                    <div className="flex flex-wrap items-baseline gap-1.5 font-mono text-xs leading-loose">
+                      {tokenList.slice(0, currentIndex).map((tok, i) => {
+                        // Dynamic Pastel/Neon Badge Color Alternator
+                        const colors = [
+                          'bg-emerald-950/80 text-emerald-300 border-emerald-800/80 hover:bg-emerald-800/90',
+                          'bg-cyan-950/80 text-cyan-300 border-cyan-800/80 hover:bg-cyan-800/90',
+                          'bg-purple-950/80 text-purple-300 border-purple-800/80 hover:bg-purple-800/90',
+                          'bg-amber-950/80 text-amber-300 border-amber-800/80 hover:bg-amber-800/90',
+                          'bg-pink-950/80 text-pink-300 border-pink-800/80 hover:bg-pink-800/90',
+                          'bg-indigo-950/80 text-indigo-300 border-indigo-800/80 hover:bg-indigo-800/90',
+                        ];
+                        const badgeColor = colors[i % colors.length];
+
+                        if (tok.text === '\n' || tok.text === '\n\n') {
+                          return (
+                            <React.Fragment key={i}>
+                              <span 
+                                onMouseEnter={() => setHoveredToken(tok)}
+                                onMouseLeave={() => setHoveredToken(null)}
+                                className={`token-badge border px-1.5 py-0.5 rounded text-[10px] opacity-60 ${badgeColor}`}
+                              >
+                                ↵
+                              </span>
+                              <div className="w-full h-0"></div>
+                            </React.Fragment>
+                          );
+                        }
+
+                        return (
+                          <span
+                            key={i}
+                            onMouseEnter={() => setHoveredToken(tok)}
+                            onMouseLeave={() => setHoveredToken(null)}
+                            className={`token-badge inline-block border px-1.5 py-0.5 rounded cursor-pointer ${badgeColor}`}
+                          >
+                            {tok.text.replace(/ /g, '␣')}
+                            {showTokenIDs && (
+                              <sub className="text-[9px] opacity-60 ml-1 font-sans">#{tok.id}</sub>
+                            )}
+                          </span>
+                        );
+                      })}
+
+                      {currentIndex < tokenList.length && (
+                        <span className="terminal-cursor"></span>
+                      )}
+
+                      {currentIndex === 0 && (
+                        <div className="text-slate-400 italic font-mono text-xs text-center py-20 w-full">
+                          Press "Play Stream" to watch text tokenize into color-coded BPE subword badges...
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 3. TOKEN MATRIX INSPECTOR GRID VIEW */}
+                  {viewMode === 'inspector' && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left font-mono text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px]">
+                            <th className="py-2 px-3">Index</th>
+                            <th className="py-2 px-3">Token ID</th>
+                            <th className="py-2 px-3">String Fragment</th>
+                            <th className="py-2 px-3">Type</th>
+                            <th className="py-2 px-3">Length</th>
+                            <th className="py-2 px-3">Bytes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60">
+                          {tokenList.slice(0, currentIndex).map((tok, idx) => (
+                            <tr key={idx} className="hover:bg-slate-800/40">
+                              <td className="py-2 px-3 text-slate-400">#{idx}</td>
+                              <td className="py-2 px-3 text-cyan-300 font-bold">{tok.id}</td>
+                              <td className="py-2 px-3 text-slate-200">
+                                <span className="bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                                  {tok.text === '\n' ? '\\n' : tok.text.replace(/ /g, '␣')}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3">
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-purple-300 border border-purple-800/50">
+                                  {tok.type}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-slate-400">{tok.length} chars</td>
+                              <td className="py-2 px-3 text-slate-400">{tok.bytes} B</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      {currentIndex === 0 && (
+                        <div className="text-slate-400 italic font-mono text-xs text-center py-20">
+                          No tokens generated yet. Start playback to populate token matrix table...
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+
+                {/* HOVER TOOLTIP FLOATING INSPECTOR FOOTER */}
+                {hoveredToken && (
+                  <div className="bg-slate-950 border-t border-slate-800 px-4 py-2 flex items-center justify-between text-xs font-mono text-slate-300">
+                    <div className="flex items-center gap-3">
+                      <span className="text-cyan-400 font-bold">Token #{hoveredToken.idx}</span>
+                      <span>ID: <strong className="text-purple-300">{hoveredToken.id}</strong></span>
+                      <span>Value: <strong className="text-emerald-300">"{hoveredToken.text.replace(/\n/g, '\\n')}"</strong></span>
+                    </div>
+                    <div className="flex items-center gap-3 text-slate-400">
+                      <span>Type: {hoveredToken.type}</span>
+                      <span>Length: {hoveredToken.length} chars</span>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+            </div>
+
+          </main>
+
+          {/* FOOTER */}
+          <footer className="border-t border-slate-800/80 bg-slate-900/40 py-3 px-4 text-center text-xs text-slate-400 font-mono">
+            LLM Token Generation Simulator • Built for AI Engineers & Researchers • Web Audio API & Subword BPE Engine
+          </footer>
+
+        </div>
+      );
+
+      function customKeyOrCustom() {
+        return 'custom';
+      }
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
